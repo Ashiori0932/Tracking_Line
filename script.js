@@ -5,6 +5,7 @@ const MATCH_DURATION = 1150;
 const WINDOW_SIZE = 12;
 const CENTER_MATCH = WINDOW_SIZE / 2;
 const INITIAL_DISPLAYED_RANGE = 60;
+
 const COLORS = [
   "#cf3f27", "#126783", "#ce9215", "#39714e", "#745087",
   "#db655d", "#59666e", "#718a31", "#30467d", "#ae6220"
@@ -49,7 +50,8 @@ function valueAt(team, time) {
   const fraction = time - match;
   const from = team.values[match];
   const to = team.values[match + 1];
-  const eased = fraction * fraction * (3 - 2 * fraction);
+  const smoothFraction = fraction * fraction * (3 - 2 * fraction);
+  const eased = fraction + (smoothFraction - fraction) * VALUE_EASING_STRENGTH;
   return from + (to - from) * eased;
 }
 
@@ -59,8 +61,15 @@ function appendSmoothCurve(points) {
   for (let index = 1; index < points.length; index += 1) {
     const previous = points[index - 1];
     const current = points[index];
-    const controlX = (previous.x + current.x) / 2;
-    ctx.bezierCurveTo(controlX, previous.y, controlX, current.y, current.x, current.y);
+    const handleWidth = (current.x - previous.x) * CURVE_HANDLE_RATIO;
+    ctx.bezierCurveTo(
+      previous.x + handleWidth,
+      previous.y,
+      current.x - handleWidth,
+      current.y,
+      current.x,
+      current.y
+    );
   }
 }
 

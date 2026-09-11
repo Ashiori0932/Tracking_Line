@@ -5,8 +5,7 @@ const MATCH_DURATION = 1150;
 const WINDOW_SIZE = 12;
 const CENTER_MATCH = WINDOW_SIZE / 2;
 const INITIAL_DISPLAYED_RANGE = 60;
-const VALUE_EASING_STRENGTH = 0.35;
-const CURVE_HANDLE_RATIO = 0.28;
+
 const COLORS = [
   "#cf3f27", "#126783", "#ce9215", "#39714e", "#745087",
   "#db655d", "#59666e", "#718a31", "#30467d", "#ae6220"

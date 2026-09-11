@@ -14,19 +14,21 @@ let startTime = performance.now();
 let lastFrame = startTime;
 let displayedRange = 60;
 
-function scoreDelta(team, match) {
+
+function scoreForMatch(team, match, previous) {
   const direction = team % 2 === 0 ? 1 : -1;
-  const trend = direction * (8 + (team % 4) * 3);
-  const swing = Math.sin(match * 0.81 + team * 1.73) * (18 + team * 1.8);
-  const shock = Math.sin(match * 2.37 + team * 4.11) * 14;
-  return Math.round(trend + swing + shock);
+  const volatility = 10 + 34 * (0.5 + 0.5 * Math.sin(match * 0.14 - 1.2));
+  const swing = Math.sin(match * 0.82 + team * 1.73) * volatility;
+  const shock = Math.sin(match * 2.37 + team * 4.11) * volatility * 0.45;
+  const pullToZero = -previous * 0.13;
+  return Math.round(previous + direction * 5 + swing + shock + pullToZero);
 }
 
 function ensureData(lastMatch) {
   teams.forEach((team) => {
     while (team.values.length <= lastMatch + 1) {
       const match = team.values.length;
-      team.values.push(team.values.at(-1) + scoreDelta(team.index, match));
+      team.values.push(scoreForMatch(team.index, match, team.values.at(-1)));
     }
   });
 }
@@ -60,9 +62,21 @@ function appendSmoothCurve(points) {
   }
 }
 
-function roundedRange(peak) {
-  const magnitude = 10 ** Math.floor(Math.log10(Math.max(peak, 1)));
-  return Math.ceil((peak * 1.16) / magnitude) * magnitude;
+
+function niceStep(rawStep) {
+  const magnitude = 10 ** Math.floor(Math.log10(Math.max(rawStep, 1)));
+  const fraction = rawStep / magnitude;
+  const niceFraction = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10;
+  return niceFraction * magnitude;
+}
+
+function scaleForPeak(peak) {
+  const majorStep = niceStep((peak * 2.3) / 8);
+  return {
+    majorStep,
+    range: Math.max(majorStep * 2, Math.ceil((peak * 1.12) / majorStep) * majorStep)
+  };
+
 }
 
 function draw(now) {
@@ -86,16 +100,18 @@ function draw(now) {
   const xAt = match => margin.left + ((match - viewStart) / WINDOW_SIZE) * plotWidth;
 
   const visibleValues = teams.flatMap((team) => {
-    const first = Math.floor(viewStart);
-    const last = Math.min(completedMatch, Math.ceil(viewEnd));
-    const values = team.values.slice(first, last + 1);
-    values.push(valueAt(team, playhead));
+    const first = Math.ceil(viewStart);
+    const values = team.values.slice(first, completedMatch + 1);
+    values.push(valueAt(team, viewStart), valueAt(team, playhead));
     return values;
   });
-  const peak = Math.max(40, ...visibleValues.map(Math.abs));
-  const targetRange = roundedRange(peak);
+  const peak = Math.max(8, ...visibleValues.map(Math.abs));
+  const scale = scaleForPeak(peak);
+  const targetRange = scale.range;
   const frameSeconds = Math.min(0.05, (now - lastFrame) / 1000);
-  displayedRange += (targetRange - displayedRange) * (1 - Math.exp(-3.2 * frameSeconds));
+  const scaleRate = targetRange > displayedRange ? 6 : 1.8;
+  displayedRange += (targetRange - displayedRange) * (1 - Math.exp(-scaleRate * frameSeconds));
+
   lastFrame = now;
 
   const yAt = score => margin.top + plotHeight / 2 - (score / displayedRange) * (plotHeight / 2);
@@ -107,18 +123,34 @@ function draw(now) {
   ctx.textBaseline = "middle";
   ctx.textAlign = "right";
 
-  for (let step = -4; step <= 4; step += 1) {
-    const score = (displayedRange / 4) * step;
+
+  // Minor and major elevation contours make the current Y-axis scale explicit.
+  const contourStep = niceStep((displayedRange * 2) / 8);
+  const minorStep = contourStep / 2;
+  const firstContour = Math.ceil(-displayedRange / minorStep) * minorStep;
+  for (let score = firstContour; score <= displayedRange; score += minorStep) {
+    const isZero = Math.abs(score) < minorStep / 10;
+    const isMajor = Math.abs(score / contourStep - Math.round(score / contourStep)) < 0.01;
     const y = yAt(score);
-    ctx.strokeStyle = step === 0 ? "rgba(28,30,25,.78)" : "rgba(28,30,25,.17)";
-    ctx.lineWidth = step === 0 ? 1.5 : 1;
-    ctx.setLineDash(step === 0 ? [] : [2, 5]);
+    ctx.strokeStyle = isZero
+      ? "rgba(28,30,25,.8)"
+      : isMajor ? "rgba(28,30,25,.22)" : "rgba(28,30,25,.1)";
+    ctx.lineWidth = isZero ? 1.6 : isMajor ? 1 : 0.7;
+    ctx.setLineDash(isZero ? [] : isMajor ? [3, 5] : [1, 6]);
     ctx.beginPath();
     ctx.moveTo(margin.left, y);
     ctx.lineTo(width - margin.right, y);
     ctx.stroke();
-    ctx.fillStyle = "rgba(28,30,25,.7)";
-    ctx.fillText(Math.round(score), margin.left - 9, y);
+
+    if (isMajor) {
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(margin.left - 5, y);
+      ctx.lineTo(margin.left, y);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(28,30,25,.72)";
+      ctx.fillText(Math.round(score), margin.left - 10, y);
+    }
   }
 
   ctx.textAlign = "center";
@@ -176,4 +208,5 @@ function draw(now) {
 
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
+
 requestAnimationFrame(draw);

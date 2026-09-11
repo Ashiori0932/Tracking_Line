@@ -4,6 +4,9 @@ const ctx = canvas.getContext("2d");
 const MATCH_DURATION = 1150;
 const WINDOW_SIZE = 12;
 const CENTER_MATCH = WINDOW_SIZE / 2;
+const INITIAL_DISPLAYED_RANGE = 60;
+const VALUE_EASING_STRENGTH = 0.35;
+const CURVE_HANDLE_RATIO = 0.28;
 const COLORS = [
   "#cf3f27", "#126783", "#ce9215", "#39714e", "#745087",
   "#db655d", "#59666e", "#718a31", "#30467d", "#ae6220"
@@ -12,7 +15,8 @@ const teams = COLORS.map((color, index) => ({ color, index, values: [0] }));
 
 let startTime = performance.now();
 let lastFrame = startTime;
-let displayedRange = 60;
+let displayedRange = INITIAL_DISPLAYED_RANGE;
+let hasExpandedYAxis = false;
 
 
 function scoreForMatch(team, match, previous) {
@@ -47,7 +51,8 @@ function valueAt(team, time) {
   const fraction = time - match;
   const from = team.values[match];
   const to = team.values[match + 1];
-  const eased = fraction * fraction * (3 - 2 * fraction);
+  const smoothFraction = fraction * fraction * (3 - 2 * fraction);
+  const eased = fraction + (smoothFraction - fraction) * VALUE_EASING_STRENGTH;
   return from + (to - from) * eased;
 }
 
@@ -57,8 +62,15 @@ function appendSmoothCurve(points) {
   for (let index = 1; index < points.length; index += 1) {
     const previous = points[index - 1];
     const current = points[index];
-    const controlX = (previous.x + current.x) / 2;
-    ctx.bezierCurveTo(controlX, previous.y, controlX, current.y, current.x, current.y);
+    const handleWidth = (current.x - previous.x) * CURVE_HANDLE_RATIO;
+    ctx.bezierCurveTo(
+      previous.x + handleWidth,
+      previous.y,
+      current.x - handleWidth,
+      current.y,
+      current.x,
+      current.y
+    );
   }
 }
 
@@ -70,13 +82,9 @@ function niceStep(rawStep) {
   return niceFraction * magnitude;
 }
 
-function scaleForPeak(peak) {
-  const majorStep = niceStep((peak * 2.3) / 8);
-  return {
-    majorStep,
-    range: Math.max(majorStep * 2, Math.ceil((peak * 1.12) / majorStep) * majorStep)
-  };
-
+function rangeForPeak(peak) {
+  // Keep the range continuous; only contour labels need rounded, human-friendly steps.
+  return Math.max(20, peak * 1.12);
 }
 
 function draw(now) {
@@ -106,18 +114,23 @@ function draw(now) {
     return values;
   });
   const peak = Math.max(8, ...visibleValues.map(Math.abs));
-  const scale = scaleForPeak(peak);
-  const targetRange = scale.range;
+  const targetRange = rangeForPeak(peak);
   const frameSeconds = Math.min(0.05, (now - lastFrame) / 1000);
-  const scaleRate = targetRange > displayedRange ? 6 : 1.8;
-  displayedRange += (targetRange - displayedRange) * (1 - Math.exp(-scaleRate * frameSeconds));
+  const isExpanding = targetRange > displayedRange;
+  if (targetRange > INITIAL_DISPLAYED_RANGE) {
+    hasExpandedYAxis = true;
+  }
+  if (isExpanding || hasExpandedYAxis) {
+    const scaleRate = isExpanding ? 6 : 1.8;
+    displayedRange += (targetRange - displayedRange) * (1 - Math.exp(-scaleRate * frameSeconds));
+  }
 
   lastFrame = now;
 
   const yAt = score => margin.top + plotHeight / 2 - (score / displayedRange) * (plotHeight / 2);
   ctx.clearRect(0, 0, width, height);
 
-  ctx.font = `${width < 520 ? 9 : 11}px "Courier New", monospace`;
+  ctx.font = `600 ${width < 520 ? 11 : 14}px "Courier New", monospace`;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.textBaseline = "middle";
@@ -133,10 +146,10 @@ function draw(now) {
     const isMajor = Math.abs(score / contourStep - Math.round(score / contourStep)) < 0.01;
     const y = yAt(score);
     ctx.strokeStyle = isZero
-      ? "rgba(28,30,25,.8)"
-      : isMajor ? "rgba(28,30,25,.22)" : "rgba(28,30,25,.1)";
-    ctx.lineWidth = isZero ? 1.6 : isMajor ? 1 : 0.7;
-    ctx.setLineDash(isZero ? [] : isMajor ? [3, 5] : [1, 6]);
+      ? "rgba(28,30,25,.86)"
+      : isMajor ? "rgba(28,30,25,.3)" : "rgba(28,30,25,.16)";
+    ctx.lineWidth = isZero ? 2.4 : isMajor ? 1.6 : 1.1;
+    ctx.setLineDash(isZero ? [] : isMajor ? [4, 5] : [2, 6]);
     ctx.beginPath();
     ctx.moveTo(margin.left, y);
     ctx.lineTo(width - margin.right, y);
@@ -145,11 +158,11 @@ function draw(now) {
     if (isMajor) {
       ctx.setLineDash([]);
       ctx.beginPath();
-      ctx.moveTo(margin.left - 5, y);
+      ctx.moveTo(margin.left - 7, y);
       ctx.lineTo(margin.left, y);
       ctx.stroke();
-      ctx.fillStyle = "rgba(28,30,25,.72)";
-      ctx.fillText(Math.round(score), margin.left - 10, y);
+      ctx.fillStyle = "rgba(28,30,25,.82)";
+      ctx.fillText(Math.round(score), margin.left - 12, y);
     }
   }
 
@@ -157,20 +170,20 @@ function draw(now) {
   ctx.textBaseline = "top";
   for (let match = Math.ceil(viewStart); match <= Math.floor(viewEnd); match += 1) {
     const x = xAt(match);
-    ctx.strokeStyle = "rgba(28,30,25,.1)";
-    ctx.lineWidth = 1;
-    ctx.setLineDash([2, 6]);
+    ctx.strokeStyle = "rgba(28,30,25,.16)";
+    ctx.lineWidth = 1.3;
+    ctx.setLineDash([3, 6]);
     ctx.beginPath();
     ctx.moveTo(x, margin.top);
     ctx.lineTo(x, height - margin.bottom);
     ctx.stroke();
-    ctx.fillStyle = "rgba(28,30,25,.68)";
-    ctx.fillText(String(match), x, height - margin.bottom + 12);
+    ctx.fillStyle = "rgba(28,30,25,.78)";
+    ctx.fillText(String(match), x, height - margin.bottom + 14);
   }
 
   ctx.setLineDash([]);
-  ctx.strokeStyle = "rgba(28,30,25,.72)";
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(28,30,25,.82)";
+  ctx.lineWidth = 1.8;
   ctx.strokeRect(margin.left, margin.top, plotWidth, plotHeight);
 
   teams.forEach((team) => {
@@ -191,13 +204,13 @@ function draw(now) {
     appendSmoothCurve(points);
     ctx.globalAlpha = 0.92;
     ctx.strokeStyle = team.color;
-    ctx.lineWidth = width < 520 ? 2 : 2.7;
+    ctx.lineWidth = width < 520 ? 2.8 : 3.6;
     ctx.stroke();
     const tip = points.at(-1);
     if (tip) {
       ctx.fillStyle = team.color;
       ctx.beginPath();
-      ctx.arc(tip.x, tip.y, width < 520 ? 2.5 : 3.4, 0, Math.PI * 2);
+      ctx.arc(tip.x, tip.y, width < 520 ? 3.2 : 4.2, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();

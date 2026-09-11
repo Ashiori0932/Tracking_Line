@@ -4,57 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="十支队伍随比赛场次变化的动态积分折线图" />
-    <title>十线赛况记录仪</title>
+    <title>队伍积分走势</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="paper-noise" aria-hidden="true"></div>
-    <main class="dashboard">
-      <header class="masthead">
-        <div>
-          <p class="eyebrow">MATCH TELEMETRY / SERIES 10</p>
-          <h1>十线赛况记录仪</h1>
-        </div>
-        <div class="stamp" aria-label="系统状态正常">
-          <span>LIVE</span>
-          <small>系统在线</small>
-        </div>
-      </header>
-
-      <section class="chart-card" aria-labelledby="chart-title">
-        <div class="chart-heading">
-          <div>
-            <p class="section-code">SCORE TRACE — 01</p>
-            <h2 id="chart-title">队伍积分走势</h2>
-          </div>
-          <div class="round-readout">
-            <span>当前场次</span>
-            <strong id="roundNumber">00</strong>
-          </div>
-        </div>
-
-        <div class="chart-shell">
-          <canvas id="scoreChart" role="img" aria-label="十支队伍随比赛场次变化的积分折线图"></canvas>
-          <div class="axis-label axis-y">分数 / SCORE</div>
-          <div class="axis-label axis-x">比赛场数 / MATCHES PLAYED</div>
-        </div>
-
-        <div id="legend" class="legend" aria-label="队伍图例"></div>
-      </section>
-
-      <footer class="control-strip">
-        <div class="controls">
-          <button id="toggleButton" type="button"><span class="button-icon">Ⅱ</span><span class="button-text">暂停记录</span></button>
-          <button id="resetButton" class="secondary" type="button"><span class="button-icon">↺</span><span>重新开始</span></button>
-        </div>
-        <label class="speed-control" for="speedRange">
-          <span>记录速度</span>
-          <input id="speedRange" type="range" min="350" max="1600" value="900" step="50" aria-valuetext="标准" />
-          <output id="speedLabel">标准</output>
-        </label>
-        <p class="status-line"><span class="pulse"></span><span id="statusText">正在接收赛况数据</span></p>
-      </footer>
-    </main>
+    <canvas id="scoreChart" role="img" aria-label="十支队伍随比赛场次连续变化的积分折线图"></canvas>
     <script src="script.js"></script>
   </body>
 </html>

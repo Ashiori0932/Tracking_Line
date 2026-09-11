@@ -14,6 +14,7 @@ let startTime = performance.now();
 let lastFrame = startTime;
 let displayedRange = 60;
 
+
 function scoreForMatch(team, match, previous) {
   const direction = team % 2 === 0 ? 1 : -1;
   const volatility = 10 + 34 * (0.5 + 0.5 * Math.sin(match * 0.14 - 1.2));
@@ -61,6 +62,7 @@ function appendSmoothCurve(points) {
   }
 }
 
+
 function niceStep(rawStep) {
   const magnitude = 10 ** Math.floor(Math.log10(Math.max(rawStep, 1)));
   const fraction = rawStep / magnitude;
@@ -74,6 +76,7 @@ function scaleForPeak(peak) {
     majorStep,
     range: Math.max(majorStep * 2, Math.ceil((peak * 1.12) / majorStep) * majorStep)
   };
+
 }
 
 function draw(now) {
@@ -108,6 +111,7 @@ function draw(now) {
   const frameSeconds = Math.min(0.05, (now - lastFrame) / 1000);
   const scaleRate = targetRange > displayedRange ? 6 : 1.8;
   displayedRange += (targetRange - displayedRange) * (1 - Math.exp(-scaleRate * frameSeconds));
+
   lastFrame = now;
 
   const yAt = score => margin.top + plotHeight / 2 - (score / displayedRange) * (plotHeight / 2);
@@ -118,6 +122,7 @@ function draw(now) {
   ctx.lineJoin = "round";
   ctx.textBaseline = "middle";
   ctx.textAlign = "right";
+
 
   // Minor and major elevation contours make the current Y-axis scale explicit.
   const contourStep = niceStep((displayedRange * 2) / 8);
@@ -136,6 +141,7 @@ function draw(now) {
     ctx.moveTo(margin.left, y);
     ctx.lineTo(width - margin.right, y);
     ctx.stroke();
+
     if (isMajor) {
       ctx.setLineDash([]);
       ctx.beginPath();
@@ -202,4 +208,5 @@ function draw(now) {
 
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
+
 requestAnimationFrame(draw);

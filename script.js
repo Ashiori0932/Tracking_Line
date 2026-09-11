@@ -31,7 +31,8 @@ function ensureData(lastMatch) {
   teams.forEach((team) => {
     while (team.values.length <= lastMatch + 1) {
       const match = team.values.length;
-      team.values.push(scoreForMatch(team.index, match, team.values.at(-1)));
+      const previous = team.values[team.values.length - 1];
+      team.values.push(scoreForMatch(team.index, match, previous));
     }
   });
 }
@@ -61,11 +62,11 @@ function appendSmoothCurve(points) {
   for (let index = 1; index < points.length; index += 1) {
     const previous = points[index - 1];
     const current = points[index];
-    const handleWidth = (current.x - previous.x) * CURVE_HANDLE_RATIO;
+    const third = (current.x - previous.x) / 3;
     ctx.bezierCurveTo(
-      previous.x + handleWidth,
+      previous.x + third,
       previous.y,
-      current.x - handleWidth,
+      current.x - third,
       current.y,
       current.x,
       current.y
@@ -106,11 +107,12 @@ function draw(now) {
   const viewEnd = viewStart + WINDOW_SIZE;
   const xAt = match => margin.left + ((match - viewStart) / WINDOW_SIZE) * plotWidth;
 
-  const visibleValues = teams.flatMap((team) => {
+  const visibleValues = [];
+  teams.forEach((team) => {
     const first = Math.ceil(viewStart);
     const values = team.values.slice(first, completedMatch + 1);
     values.push(valueAt(team, viewStart), valueAt(team, playhead));
-    return values;
+    visibleValues.push(...values);
   });
   const peak = Math.max(8, ...visibleValues.map(Math.abs));
   const targetRange = rangeForPeak(peak);
@@ -188,16 +190,16 @@ function draw(now) {
   teams.forEach((team) => {
     const points = [];
     const firstMatch = Math.max(0, Math.floor(viewStart) - 1);
-    for (let match = firstMatch; match <= completedMatch; match += 1) {
+    // Build the complete active segment once, then reveal it up to the playhead.
+    // This keeps already-visible geometry stable instead of refitting it every frame.
+    for (let match = firstMatch; match <= completedMatch + 1; match += 1) {
       points.push({ x: xAt(match), y: yAt(team.values[match]) });
-    }
-    if (playhead > 0) {
-      points.push({ x: xAt(playhead), y: yAt(valueAt(team, playhead)) });
     }
 
     ctx.save();
     ctx.beginPath();
-    ctx.rect(margin.left, margin.top, plotWidth, plotHeight);
+    const revealedWidth = Math.max(0, Math.min(plotWidth, xAt(playhead) - margin.left));
+    ctx.rect(margin.left, margin.top, revealedWidth, plotHeight);
     ctx.clip();
     ctx.beginPath();
     appendSmoothCurve(points);
@@ -205,14 +207,26 @@ function draw(now) {
     ctx.strokeStyle = team.color;
     ctx.lineWidth = width < 520 ? 2.8 : 3.6;
     ctx.stroke();
-    const tip = points.at(-1);
-    if (tip) {
+    ctx.restore();
+    if (playhead > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(margin.left, margin.top, plotWidth, plotHeight);
+      ctx.clip();
+      ctx.globalAlpha = 0.92;
       ctx.fillStyle = team.color;
       ctx.beginPath();
-      ctx.arc(tip.x, tip.y, width < 520 ? 3.2 : 4.2, 0, Math.PI * 2);
+      ctx.arc(
+        xAt(playhead),
+        yAt(valueAt(team, playhead)),
+        width < 520 ? 3.2 : 4.2,
+        0,
+        Math.PI * 2
+      );
+
       ctx.fill();
+      ctx.restore();
     }
-    ctx.restore();
   });
 
   requestAnimationFrame(draw);

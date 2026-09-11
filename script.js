@@ -72,13 +72,9 @@ function niceStep(rawStep) {
   return niceFraction * magnitude;
 }
 
-function scaleForPeak(peak) {
-  const majorStep = niceStep((peak * 2.3) / 8);
-  return {
-    majorStep,
-    range: Math.max(majorStep * 2, Math.ceil((peak * 1.12) / majorStep) * majorStep)
-  };
-
+function rangeForPeak(peak) {
+  // Keep the range continuous; only contour labels need rounded, human-friendly steps.
+  return Math.max(20, peak * 1.12);
 }
 
 function draw(now) {
@@ -108,8 +104,7 @@ function draw(now) {
     return values;
   });
   const peak = Math.max(8, ...visibleValues.map(Math.abs));
-  const scale = scaleForPeak(peak);
-  const targetRange = scale.range;
+  const targetRange = rangeForPeak(peak);
   const frameSeconds = Math.min(0.05, (now - lastFrame) / 1000);
   const isExpanding = targetRange > displayedRange;
   if (targetRange > INITIAL_DISPLAYED_RANGE) {
